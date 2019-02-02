@@ -11,11 +11,12 @@ library(pROC)
 library(caret)
 library(sqldf)
 getwd();
-hospital=read.csv(file.choose(), header = TRUE, na.strings = c("NA","","#NA"))
+setwd()
+hospital=read.csv("./data-set/NRD_2016_Hospital", header = TRUE, na.strings = c("NA","","#NA"))
 sevierty=read.csv(file.choose(), header = TRUE, na.strings = c("NA","","#NA"))
 head(hospital)
 str(hospital)
-
+# how to push to github
 #TBD: Data prep for different models (includes visuals)
 
 #TBD: creation of models
