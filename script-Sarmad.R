@@ -143,3 +143,5 @@ View(Sev_Hosp)
 
 Core_Sev_Hosp <- merge(NRD_2016_Core, Sev_Hosp, by="KEY_NRD")
 View(Core_Sev_Hosp)
+
+#write.csv(NRD_2016_Core, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core_FirstMillion.CSV")
