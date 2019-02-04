@@ -136,3 +136,10 @@ names(NRD_2016_Hospital) <- c("HOSP_BEDSIZE",
                               "YEAR")
 
 View(NRD_2016_Hospital)
+
+
+Sev_Hosp <- merge(NRD_2016_Severity, NRD_2016_Hospital, by="HOSP_NRD")
+View(Sev_Hosp)
+
+Core_Sev_Hosp <- merge(NRD_2016_Core, Sev_Hosp, by="KEY_NRD")
+View(Core_Sev_Hosp)
