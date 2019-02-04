@@ -137,6 +137,8 @@ names(NRD_2016_Hospital) <- c("HOSP_BEDSIZE",
 
 View(NRD_2016_Hospital)
 
+# to eliminate showing KEY_NRD in scientific notation
+options(scipen = 999)
 
 Sev_Hosp <- merge(NRD_2016_Severity, NRD_2016_Hospital, by="HOSP_NRD")
 View(Sev_Hosp)
