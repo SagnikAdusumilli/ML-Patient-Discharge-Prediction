@@ -1,8 +1,20 @@
-NRD_2016_Core <- read.csv("~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core.CSV",
-                          header=FALSE,
-                          nrows=1000000)
+#library(R.utils)
+#numberOfLines <- countLines("~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core.CSV")
+#numberOfLines #17,197,683
 
-names(NRD_2016_Core) <- c("AGE",
+#library(sqldf)
+#NRD_2016_Core <- read.csv.sql("~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core.CSV",
+#                              sql="select * from file")
+
+NRD_2016_Core_1 <- read.csv("~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core.CSV",
+                          header=FALSE,
+                          nrows=10000000)
+
+NRD_2016_Core_2 <- read.csv("~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core.CSV",
+                            header=FALSE,
+                            skip=10000000)
+
+NRD_2016_Core_Colnames <- c("AGE",
                           "AWEEKEND",
                           "DIED",
                           "DISCWT",
@@ -106,7 +118,56 @@ names(NRD_2016_Core) <- c("AGE",
                           "DXVER",
                           "PRVER")
 
-View(NRD_2016_Core)
+names(NRD_2016_Core_1) <- NRD_2016_Core_Colnames
+names(NRD_2016_Core_2) <- NRD_2016_Core_Colnames
+
+View(NRD_2016_Core_2)
+
+library(sqldf)
+
+where_clause <- "where I10_DX1 like 'I50%'
+                 or I10_DX2 like 'I50%'
+                 or I10_DX3 like 'I50%'
+                 or I10_DX4 like 'I50%'
+                 or I10_DX5 like 'I50%'
+                 or I10_DX6 like 'I50%'
+                 or I10_DX7 like 'I50%'
+                 or I10_DX8 like 'I50%'
+                 or I10_DX9 like 'I50%'
+                 or I10_DX10 like 'I50%'
+                 or I10_DX11 like 'I50%'
+                 or I10_DX12 like 'I50%'
+                 or I10_DX13 like 'I50%'
+                 or I10_DX14 like 'I50%'
+                 or I10_DX15 like 'I50%'
+                 or I10_DX16 like 'I50%'
+                 or I10_DX17 like 'I50%'
+                 or I10_DX18 like 'I50%'
+                 or I10_DX19 like 'I50%'
+                 or I10_DX20 like 'I50%'
+                 or I10_DX21 like 'I50%'
+                 or I10_DX22 like 'I50%'
+                 or I10_DX23 like 'I50%'
+                 or I10_DX24 like 'I50%'
+                 or I10_DX25 like 'I50%'
+                 or I10_DX26 like 'I50%'
+                 or I10_DX27 like 'I50%'
+                 or I10_DX28 like 'I50%'
+                 or I10_DX29 like 'I50%'
+                 or I10_DX30 like 'I50%'
+                 or I10_DX31 like 'I50%'
+                 or I10_DX32 like 'I50%'
+                 or I10_DX33 like 'I50%'
+                 or I10_DX34 like 'I50%'
+                 or I10_DX35 like 'I50%'" 
+
+NRD_2016_Core_1_HeartFailure <- sqldf(paste("select * from NRD_2016_Core_1", where_clause))
+
+NRD_2016_Core_2_HeartFailure <- sqldf(paste("select * from NRD_2016_Core_2", where_clause))
+
+NRD_2016_Core_HeartFailure <- rbind(NRD_2016_Core_1_HeartFailure, NRD_2016_Core_2_HeartFailure) 
+ #drop NRD_2016_Core_1_HeartFailure and NRD_2016_Core_2_HeartFailure from memory
+#?rm
 
 NRD_2016_Severity <- read.csv("~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Severity.CSV",
                               header=FALSE)
@@ -143,7 +204,24 @@ options(scipen = 999)
 Sev_Hosp <- merge(NRD_2016_Severity, NRD_2016_Hospital, by="HOSP_NRD")
 View(Sev_Hosp)
 
-Core_Sev_Hosp <- merge(NRD_2016_Core, Sev_Hosp, by="KEY_NRD")
-View(Core_Sev_Hosp)
+Core_HeartFailure_Sev_Hosp <- merge(NRD_2016_Core_HeartFailure, Sev_Hosp, by="KEY_NRD")
+View(Core_HeartFailure_Sev_Hosp)
 
-#write.csv(NRD_2016_Core, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core_FirstMillion.CSV")
+#write.csv(NRD_2016_Core_HeartFailure, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core_HeartFailure.CSV")
+#write.csv(Core_HeartFailure_Sev_Hosp, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Core_HeartFailure_Sev_Hosp.CSV")
+
+Core_HeartFailure_Sev_Hosp$PseudoDDate <- Core_HeartFailure_Sev_Hosp$NRD_DaysToEvent + Core_HeartFailure_Sev_Hosp$LOS
+
+Core_HeartFailure_Sev_Hosp$IndexEvent <- (Core_HeartFailure_Sev_Hosp$I10_DX1 == 'I5023') & (Core_HeartFailure_Sev_Hosp$AGE == 84) & (Core_HeartFailure_Sev_Hosp$SAMEDAYEVENT == 2)
+
+Core_HeartFailure_Sev_Hosp_Readmissions <- sqldf("select distinct i.NRD_VisitLink, i.KEY_NRD, 
+	                                               case when not missing(c.KEY_NRD) then 'TRUE' else 'FALSE' end as Readmit,
+                                                 c.TOTCHG as ReadmitCHG,
+                                                 c.NRD_DaysToEvent as DaysToReadmit,
+                                                 c.PseudoDDate as PseudoDDate_R
+                                                 from Core_HeartFailure_Sev_Hosp as i 
+                                                 inner join Core_HeartFailure_Sev_Hosp as c
+                                                 on i.NRD_VisitLink=c.NRD_VisitLink and i.KEY_NRD ne c.KEY_NRD
+                                                 and i.IndexEvent='TRUE'
+                                                 and (c.NRD_DaysToEvent-i.PseudoDDate) between 0 and 30 
+                                                 order by i.NRD_VisitLink, i.KEY_NRD, c.NRD_DaysToEvent, c.PseudoDDate")
