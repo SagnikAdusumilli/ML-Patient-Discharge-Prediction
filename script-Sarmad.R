@@ -166,8 +166,13 @@ NRD_2016_Core_1_HeartFailure <- sqldf(paste("select * from NRD_2016_Core_1", whe
 NRD_2016_Core_2_HeartFailure <- sqldf(paste("select * from NRD_2016_Core_2", where_clause))
 
 NRD_2016_Core_HeartFailure <- rbind(NRD_2016_Core_1_HeartFailure, NRD_2016_Core_2_HeartFailure) 
- #drop NRD_2016_Core_1_HeartFailure and NRD_2016_Core_2_HeartFailure from memory
-#?rm
+
+remove(NRD_2016_Core_1)
+remove(NRD_2016_Core_2)
+remove(NRD_2016_Core_Colnames)
+remove(where_clause)
+remove(NRD_2016_Core_1_HeartFailure)
+remove(NRD_2016_Core_2_HeartFailure)
 
 NRD_2016_Severity <- read.csv("~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Severity.CSV",
                               header=FALSE)
@@ -207,21 +212,43 @@ View(Sev_Hosp)
 Core_HeartFailure_Sev_Hosp <- merge(NRD_2016_Core_HeartFailure, Sev_Hosp, by="KEY_NRD")
 View(Core_HeartFailure_Sev_Hosp)
 
+remove(NRD_2016_Severity)
+remove(NRD_2016_Hospital)
+remove(Sev_Hosp)
+
 #write.csv(NRD_2016_Core_HeartFailure, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/NRD_2016_Core_HeartFailure.CSV")
 #write.csv(Core_HeartFailure_Sev_Hosp, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Core_HeartFailure_Sev_Hosp.CSV")
 
 Core_HeartFailure_Sev_Hosp$PseudoDDate <- Core_HeartFailure_Sev_Hosp$NRD_DaysToEvent + Core_HeartFailure_Sev_Hosp$LOS
 
-Core_HeartFailure_Sev_Hosp$IndexEvent <- (Core_HeartFailure_Sev_Hosp$I10_DX1 == 'I5023') & (Core_HeartFailure_Sev_Hosp$AGE == 84) & (Core_HeartFailure_Sev_Hosp$SAMEDAYEVENT == 2)
+#Core_HeartFailure_Sev_Hosp$IndexEvent <- (Core_HeartFailure_Sev_Hosp$I10_DX1 == 'I509') & (Core_HeartFailure_Sev_Hosp$SAMEDAYEVENT == 0) & (Core_HeartFailure_Sev_Hosp$DIED == 0)
+Core_HeartFailure_Sev_Hosp$IndexEvent <- ifelse(grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX1) | grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX2) | grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX3), 1, 0)
 
-Core_HeartFailure_Sev_Hosp_Readmissions <- sqldf("select distinct i.NRD_VisitLink, i.KEY_NRD, 
-	                                               case when not missing(c.KEY_NRD) then 'TRUE' else 'FALSE' end as Readmit,
+Visits_Readmissions <- sqldf("select i.NRD_VisitLink, i.KEY_NRD, i.NRD_DaysToEvent, i.LOS, i.PseudoDDate, i.I10_DX1, i.I10_DX2, i.I10_DX3, i.IndexEvent, c.KEY_NRD, c.NRD_DaysToEvent, c.NRD_DaysToEvent-i.PseudoDDate As Diff, c.I10_DX1, c.I10_DX2, c.I10_DX3, c.IndexEvent
+	                                               /*case when c.KEY_NRD is not null then 'TRUE' else 'FALSE' end as Readmit,
                                                  c.TOTCHG as ReadmitCHG,
                                                  c.NRD_DaysToEvent as DaysToReadmit,
-                                                 c.PseudoDDate as PseudoDDate_R
+                                                 c.PseudoDDate as PseudoDDate_R*/
                                                  from Core_HeartFailure_Sev_Hosp as i 
                                                  inner join Core_HeartFailure_Sev_Hosp as c
-                                                 on i.NRD_VisitLink=c.NRD_VisitLink and i.KEY_NRD ne c.KEY_NRD
-                                                 and i.IndexEvent='TRUE'
-                                                 and (c.NRD_DaysToEvent-i.PseudoDDate) between 0 and 30 
-                                                 order by i.NRD_VisitLink, i.KEY_NRD, c.NRD_DaysToEvent, c.PseudoDDate")
+                                                 on i.NRD_VisitLink=c.NRD_VisitLink and i.KEY_NRD <> c.KEY_NRD
+                                                 and i.IndexEvent=1
+                                                 and (c.NRD_DaysToEvent-i.PseudoDDate) between 0 and 30
+                                                 /*where i.NRD_VisitLink = 'd00306n'*/
+                                                 order by i.NRD_VisitLink, i.NRD_DaysToEvent, i.PseudoDDate, c.NRD_DaysToEvent/*i.NRD_VisitLink, i.KEY_NRD, c.NRD_DaysToEvent, c.PseudoDDate*/")
+
+View(Visits_Readmissions)
+
+#temp <- sqldf("select NRD_VisitLink, KEY_NRD, NRD_DaysToEvent, LOS, PseudoDDate, I10_DX1, I10_DX2, I10_DX3, IndexEvent from Core_HeartFailure_Sev_Hosp where NRD_VisitLink = 'd00306n' order by NRD_DaysToEvent")
+#View(temp)
+
+Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days <- sqldf("select i.*
+                                                                        from Core_HeartFailure_Sev_Hosp as i 
+                                                                        where i.KEY_NRD in (select KEY_NRD from Visits_Readmissions)
+                                                                        order by i.NRD_VisitLink, i.NRD_DaysToEvent, i.PseudoDDate")
+
+View(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days)  #150,110 records
+
+#write.csv(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Visits_Readmissions.CSV")
+#write.csv(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days.CSV")
+
