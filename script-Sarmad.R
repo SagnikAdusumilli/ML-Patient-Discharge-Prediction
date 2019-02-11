@@ -233,22 +233,39 @@ Visits_Readmissions <- sqldf("select i.NRD_VisitLink, i.KEY_NRD, i.NRD_DaysToEve
                                                  inner join Core_HeartFailure_Sev_Hosp as c
                                                  on i.NRD_VisitLink=c.NRD_VisitLink and i.KEY_NRD <> c.KEY_NRD
                                                  and i.IndexEvent=1
-                                                 and (c.NRD_DaysToEvent-i.PseudoDDate) between 0 and 30
+                                                 and (c.NRD_DaysToEvent-i.PseudoDDate) >= 0 /*between 0 and 30*/
                                                  /*where i.NRD_VisitLink = 'd00306n'*/
                                                  order by i.NRD_VisitLink, i.NRD_DaysToEvent, i.PseudoDDate, c.NRD_DaysToEvent/*i.NRD_VisitLink, i.KEY_NRD, c.NRD_DaysToEvent, c.PseudoDDate*/")
 
 View(Visits_Readmissions)
 
+Visits_Readmissions$ReadmittedWithin30Days <- ifelse(Visits_Readmissions$Diff <= 30, 1, 0)
+
 #temp <- sqldf("select NRD_VisitLink, KEY_NRD, NRD_DaysToEvent, LOS, PseudoDDate, I10_DX1, I10_DX2, I10_DX3, IndexEvent from Core_HeartFailure_Sev_Hosp where NRD_VisitLink = 'd00306n' order by NRD_DaysToEvent")
 #View(temp)
 
-Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days <- sqldf("select i.*
-                                                                        from Core_HeartFailure_Sev_Hosp as i 
-                                                                        where i.KEY_NRD in (select KEY_NRD from Visits_Readmissions)
-                                                                        order by i.NRD_VisitLink, i.NRD_DaysToEvent, i.PseudoDDate")
+Core_HeartFailure_Sev_Hosp_Y <- Core_HeartFailure_Sev_Hosp
 
-View(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days)  #150,110 records
+Core_HeartFailure_Sev_Hosp_Y$ReadmittedWithin30Days <- 0
+
+View(Core_HeartFailure_Sev_Hosp_Y)
+
+#temp <- sqldf("select * from Visits_Readmissions where ReadmittedWithin30Days = 1")
+#View(temp)
+
+Core_HeartFailure_Sev_Hosp_Y <- sqldf(c("Update Core_HeartFailure_Sev_Hosp_Y
+                                      Set ReadmittedWithin30Days = 1
+                                      where KEY_NRD in (select KEY_NRD from Visits_Readmissions where ReadmittedWithin30Days = 1)", "select * from Core_HeartFailure_Sev_Hosp_Y"))
+
+#temp <- sqldf("select * from Core_HeartFailure_Sev_Hosp_Y where ReadmittedWithin30Days = 0")
+#View(temp)
+
+#Core_HeartFailure_Sev_Hosp_Y
+#ReadmittedWithin30Days = 1     150,110
+#ReadmittedWithin30Days = 0   2,317,261
+#Total                        2,467,371
 
 #write.csv(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Visits_Readmissions.CSV")
 #write.csv(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days.CSV")
 
+# use Core_HeartFailure_Sev_Hosp_Y for modelling
