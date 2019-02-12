@@ -222,7 +222,11 @@ remove(Sev_Hosp)
 Core_HeartFailure_Sev_Hosp$PseudoDDate <- Core_HeartFailure_Sev_Hosp$NRD_DaysToEvent + Core_HeartFailure_Sev_Hosp$LOS
 
 #Core_HeartFailure_Sev_Hosp$IndexEvent <- (Core_HeartFailure_Sev_Hosp$I10_DX1 == 'I509') & (Core_HeartFailure_Sev_Hosp$SAMEDAYEVENT == 0) & (Core_HeartFailure_Sev_Hosp$DIED == 0)
-Core_HeartFailure_Sev_Hosp$IndexEvent <- ifelse(grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX1) | grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX2) | grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX3), 1, 0)
+#Core_HeartFailure_Sev_Hosp$IndexEvent <- ifelse(grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX1) | grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX2) | grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX3), 1, 0)
+Core_HeartFailure_Sev_Hosp$IndexEvent <- ifelse(Core_HeartFailure_Sev_Hosp$DMONTH >= 1 & Core_HeartFailure_Sev_Hosp$DMONTH <= 11 &
+                                                Core_HeartFailure_Sev_Hosp$DIED == 0 & Core_HeartFailure_Sev_Hosp$LOS >= 0  &
+                                                grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX1), 1, 0)
+
 
 Visits_Readmissions <- sqldf("select i.NRD_VisitLink, i.KEY_NRD, i.NRD_DaysToEvent, i.LOS, i.PseudoDDate, i.I10_DX1, i.I10_DX2, i.I10_DX3, i.IndexEvent, c.KEY_NRD, c.NRD_DaysToEvent, c.NRD_DaysToEvent-i.PseudoDDate As Diff, c.I10_DX1, c.I10_DX2, c.I10_DX3, c.IndexEvent
 	                                               /*case when c.KEY_NRD is not null then 'TRUE' else 'FALSE' end as Readmit,
@@ -244,28 +248,28 @@ Visits_Readmissions$ReadmittedWithin30Days <- ifelse(Visits_Readmissions$Diff <=
 #temp <- sqldf("select NRD_VisitLink, KEY_NRD, NRD_DaysToEvent, LOS, PseudoDDate, I10_DX1, I10_DX2, I10_DX3, IndexEvent from Core_HeartFailure_Sev_Hosp where NRD_VisitLink = 'd00306n' order by NRD_DaysToEvent")
 #View(temp)
 
-Core_HeartFailure_Sev_Hosp_Y <- Core_HeartFailure_Sev_Hosp
+Core_HeartFailure_Sev_Hosp_Y <- Core_HeartFailure_Sev_Hosp[(Core_HeartFailure_Sev_Hosp$IndexEvent==1),]
 
 Core_HeartFailure_Sev_Hosp_Y$ReadmittedWithin30Days <- 0
 
 View(Core_HeartFailure_Sev_Hosp_Y)
 
-#temp <- sqldf("select * from Visits_Readmissions where ReadmittedWithin30Days = 1")
-#View(temp)
+#temp <- sqldf("select distinct(KEY_NRD) from Visits_Readmissions where ReadmittedWithin30Days = 1")
+#View(temp)  86,933 records
 
 Core_HeartFailure_Sev_Hosp_Y <- sqldf(c("Update Core_HeartFailure_Sev_Hosp_Y
                                       Set ReadmittedWithin30Days = 1
                                       where KEY_NRD in (select KEY_NRD from Visits_Readmissions where ReadmittedWithin30Days = 1)", "select * from Core_HeartFailure_Sev_Hosp_Y"))
 
-#temp <- sqldf("select * from Core_HeartFailure_Sev_Hosp_Y where ReadmittedWithin30Days = 0")
+#temp <- sqldf("select * from Core_HeartFailure_Sev_Hosp_Y where ReadmittedWithin30Days = 1")
 #View(temp)
 
 #Core_HeartFailure_Sev_Hosp_Y
-#ReadmittedWithin30Days = 1     150,110
-#ReadmittedWithin30Days = 0   2,317,261
-#Total                        2,467,371
+#ReadmittedWithin30Days = 1      86,933
+#ReadmittedWithin30Days = 0     314,183
+#Total                          401,116
 
-#write.csv(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Visits_Readmissions.CSV")
-#write.csv(Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Core_HeartFailure_Sev_Hosp_VisitsWithReadmissionsWithin30Days.CSV")
+#write.csv(Visits_Readmissions, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Visits_Readmissions.CSV")
+#write.csv(Core_HeartFailure_Sev_Hosp_Y, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Core_HeartFailure_Sev_Hosp_Y.CSV")
 
 # use Core_HeartFailure_Sev_Hosp_Y for modelling
