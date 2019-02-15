@@ -1,7 +1,7 @@
 ###############################################################################################################
 #import packages
 ###############################################################################################################
-install.packages(c("dplyr", "reshape2", "ggplot2", "Hmisc", "corrplot", "mice", "VIM", "pROC","caret", "sqldf","data.table", "R.utils"))
+install.packages(c("dplyr", "reshape2", "ggplot2", "Hmisc", "corrplot", "mice", "VIM", "pROC","caret", "sqldf","data.table", "R.utils", "rpart", "rpart.plot", "randomForest"))
 
 library(dplyr)
 library(reshape2)
@@ -15,6 +15,9 @@ library(caret)
 library(sqldf)
 library(data.table)
 library(R.utils)
+library(rpart) # Classification Tree with rpart
+library(rpart.plot)
+library(randomForest) # classification algorithm
 
 #NRD_2016_Core=read.csv(file.choose(), header = TRUE, na.strings = c("NA","","#NA"), nrows = 10000)
 #NRD_2016_Severity=read.csv(file.choose(), header = TRUE, na.strings = c("NA","","#NA"))
@@ -237,20 +240,21 @@ remove(NRD_2016_Severity)
 remove(NRD_2016_Hospital)
 remove(Sev_Hosp)
 
-View(Core_HeartFailure_Sev_Hosp)
+#View(Core_HeartFailure_Sev_Hosp)
 
 #View(Core_HeartFailure_Sev_Hosp)
 #if not missing(LOS) and not missing(NRD_DaysToEvent) then PseudoDDate = NRD_DaysToEvent + LOS; discharge date is NRD_DaysToEvent + LOS */
 Core_HeartFailure_Sev_Hosp$PseudoDDate <- Core_HeartFailure_Sev_Hosp$NRD_DaysToEvent + Core_HeartFailure_Sev_Hosp$LOS
 
 #limited the selection of index events to predict readmission. IndexEvent =1 will be included for prediction; 0 is not an event we care about
+# only include patients admitted between Jan and Nov and did not die
 Core_HeartFailure_Sev_Hosp$IndexEvent <-ifelse(Core_HeartFailure_Sev_Hosp$DMONTH >= 1 & Core_HeartFailure_Sev_Hosp$DMONTH <= 11 &
                                         Core_HeartFailure_Sev_Hosp$DIED == 0 & Core_HeartFailure_Sev_Hosp$LOS >= 0  &
                                         grepl("I50", Core_HeartFailure_Sev_Hosp$I10_DX1) , 1, 0)
 
 #retain index events = 1; these are the events we will predict on
 Core_HeartFailure_Sev_Hosp<-Core_HeartFailure_Sev_Hosp[(Core_HeartFailure_Sev_Hosp$IndexEvent==1),]
-View(Core_HeartFailure_Sev_Hosp)
+#View(Core_HeartFailure_Sev_Hosp)
 
 
 #i-> visit; c-> readmissiomn
@@ -278,7 +282,7 @@ Visits_Readmissions <- sqldf("select
                                 (c.NRD_DaysToEvent-i.PseudoDDate) >= 0 
                              order by i.NRD_VisitLink, i.NRD_DaysToEvent, i.PseudoDDate, c.NRD_DaysToEvent")
 
-View(Visits_Readmissions)
+#View(Visits_Readmissions)
 
 #this is the classification output we are looking to predict 1 (1 if readmission is less than <= 30 day, o if readmission is less than 30 days)
 Visits_Readmissions$ReadmittedWithin30Days <- ifelse(Visits_Readmissions$Diff <= 30, 1, 0)
@@ -294,44 +298,89 @@ Core_HeartFailure_Sev_Hosp <- sqldf(c("Update Core_HeartFailure_Sev_Hosp
                                       Set ReadmittedWithin30Days = 1
                                         where KEY_NRD in (select KEY_NRD from Visits_Readmissions where ReadmittedWithin30Days = 1)", "select * from Core_HeartFailure_Sev_Hosp"))
 
-View(Core_HeartFailure_Sev_Hosp)
+#View(Core_HeartFailure_Sev_Hosp)
 
-#####################################
-# Install Packages
-#install.packages("rpart")
-#install.packages("rpart.plot")
-#####################################
+#str(Core_HeartFailure_Sev_Hosp) # check the structure of the data frame
+#ncol(Core_HeartFailure_Sev_Hosp)  #check # ofcolumns - 121
+#nrow(Core_HeartFailure_Sev_Hosp)  #check # of rows - 401,116
+
+#drop columns holding constant values have no predictive value
+Core_HeartFailure_Sev_Hosp2= subset(Core_HeartFailure_Sev_Hosp, select = -c(YEAR.y, DXVER, PRVER, DIED))
+View(Core_HeartFailure_Sev_Hosp2)
+ncol(Core_HeartFailure_Sev_Hosp2)  #check # ofcolumns - 118
+nrow(Core_HeartFailure_Sev_Hosp2)  #check # of rows - 401,116
+                                   #check for data balance
+
+remove(Core_HeartFailure_Sev_Hosp)
+
+#write.csv(Core_HeartFailure_Sev_Hosp2, file = "Core_HeartFailure_Sev_Hosp2.CSV")
+#Core_HeartFailure_Sev_Hosp2=read.csv("Core_HeartFailure_Sev_Hosp2.CSV", header = TRUE, na.strings = c("NA","","#NA"))
+
+temp1 <- sqldf("select count(*) from Core_HeartFailure_Sev_Hosp2 where ReadmittedWithin30Days = 1") 
+View(temp1)
+
+temp0 <- sqldf("select count(*) from Core_HeartFailure_Sev_Hosp2 where ReadmittedWithin30Days = 0")
+View(temp0)
+
+View(Core_HeartFailure_Sev_Hosp2)
+
+####################################################################################################################################################
+# Random Forest 
+####################################################################################################################################################
+
+# Split the data back into a train set and a test set
+train <- Core_HeartFailure_Sev_Hosp2[1:200000,]
+test <- Core_HeartFailure_Sev_Hosp2[200001:401116,]
+
+# Set a random seed
+set.seed(754)
+
+# Build the model (note: not all possible variables are used)
+rf_model <- randomForest(factor(ReadmittedWithin30Days) ~ AGE + AWEEKEND +  DISPUNIFORM + DMONTH  + DQTR + DRG + DRG_NoPOA + I10_DX1 + MDC + ELECTIVE +
+                           FEMALE + LOS + RESIDENT+ HOSP_NRD.y + HOSP_BEDSIZE + HOSP_UR_TEACH+  PAY1 + PL_NCHS + ZIPINC_QRTL + SAMEDAYEVENT,
+                         data = train)
+# Show model error
+plot(rf_model, ylim=c(0,0.36))
+legend('topright', colnames(rf_model$err.rate), col=1:3, fill=1:3)
+
+prediction <- predict(rf_model, test) # Predict using the test set
+actualTest = test[,ncol(test)] # actual outputs for test set
+confMatrixTest = table(prediction,actualTest) # compute confusion matrix
+confMatrixTest #show confusion matrix
+
+#compute accuracy
+accuracyTest = sum(diag(confMatrixTest))/sum(confMatrixTest)
+accuracyTest #show accuracy
 
 
-#####################################
-# 1) Train
+#############################################################
+# Decision Tree -- use the rpart library
+#set.seed(1984)
 
-# Using R library rpart:
-train =  # read training
-str(train) # check the structure of the data frame
+#training = createDataPartition(Core_HeartFailure_Sev_Hosp2$ReadmittedWithin30Days, p = 0.6, list=FALSE)
+#The createDataPartition command is giving me this error
+#Error in cut.default(y, unique(quantile(y, probs = seq(0, 1, length = groups))),  : 
+#                       invalid number of intervals
+#trainData = Core_HeartFailure_Sev_Hosp2[training,]
+#testData = Core_HeartFailure_Sev_Hosp2[-training,]
 
-library(rpart) # use rpart
-mod = rpart(Y ~ ., train[,-1]) # train model, remove id
-
-library(rpart.plot) # to plot the tree
-prp(mod) # plot tree
+# train model, rand generate tree
+#mod = rpart(ReadmittedWithin30Days~, data =trainData, method = "class") 
+#mod = rpart(ReadmittedWithin30Days ~ ., data =train, method = "class") 
+#prp(mod) # plot tree
 
 
 # 2) Validate
-validation =  # read validation
-str(validation) # check the structure of the data frame
-predicted = predict(mod, validation) # predict;
-actual = validation[,11] # actual outputs for
-table(actual,predicted) # show confusion matrix
-
+#validation =  # read validation
+#predicted = predict(mod, validation) # predict;
+#actual = validation[,11] # actual outputs for
+#table(actual,predicted) # show confusion matrix
 
 # 3) Test
-test =  # read test data
-str(test) # check the structure of the data frame
-test$Y = predict(mod, test) # add predicted values to test
-test
+#test =  # read test data
+#str(test) # check the structure of the data frame
+#test$Y = predict(mod, test) # add predicted values to test
+#test
 
-#check # of rows and columns
-ncol();
-nrow();
+
 
