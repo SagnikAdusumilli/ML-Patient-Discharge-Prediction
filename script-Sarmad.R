@@ -411,7 +411,10 @@ ncol(test)
 View(test)
 actualTest = test[,ncol(test)] # actual outputs for test set
 View(actualTest)
+View(prediction)
+
 confMatrixTest = table(prediction,actualTest) # compute confusion matrix
+View(confMatrixTest)
 confMatrixTest #show confusion matrix
 diag(confMatrixTest)
 sum(diag(confMatrixTest))
@@ -419,3 +422,31 @@ sum(confMatrixTest)
 #compute accuracy
 accuracyTest = sum(diag(confMatrixTest))/sum(confMatrixTest)
 accuracyTest #show accuracy
+
+library(caret)
+#sensitivity
+sensitivity(confMatrixTest)
+
+#specificity
+specificity(confMatrixTest)
+
+#ROC
+library(ROCR)
+
+# List of predictions
+#preds_list <- list(dt_preds, bag_preds, rf_preds, gbm_preds)
+preds_list <- list(prediction)
+
+# List of actual values (same for all)
+m <- length(preds_list)
+actuals_list <- rep(list(actualTest), m)
+
+# Plot the ROC curves
+#pred <- prediction(preds_list, actuals_list)
+pred <- prediction(as.numeric(prediction_under), as.numeric(actualTest))
+rocs <- performance(pred, "tpr", "fpr")
+#plot(rocs, col = as.list(1:m), main = "Test Set ROC Curves")
+plot(rocs, col = 1, main = "Test Set ROC Curves")
+legend(x = "bottomright", 
+       legend = c("Decision Tree", "Bagged Trees", "Random Forest", "GBM"),
+       fill = 1:m)
