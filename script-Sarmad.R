@@ -273,3 +273,149 @@ Core_HeartFailure_Sev_Hosp_Y <- sqldf(c("Update Core_HeartFailure_Sev_Hosp_Y
 #write.csv(Core_HeartFailure_Sev_Hosp_Y, file = "~/Machine Learning/ML 1000 - Machine Learning in Business Context/Assignment 1 - due Feb 17 2019/dataset/NRD_2016/Core_HeartFailure_Sev_Hosp_Y.CSV")
 
 # use Core_HeartFailure_Sev_Hosp_Y for modelling
+train <- Core_HeartFailure_Sev_Hosp_Y[1:200558,]
+test <- Core_HeartFailure_Sev_Hosp_Y[200559:401116,]
+
+table(train$ReadmittedWithin30Days)
+prop.table(table(train$ReadmittedWithin30Days))
+
+library(ROSE)
+
+#over sampling
+train_balanced_over <- ROSE::ovun.sample(ReadmittedWithin30Days ~ ., data = train, method = "over",N = 314696)$data
+table(train_balanced_over$ReadmittedWithin30Days)
+
+#under sampling
+train_balanced_under <- ROSE::ovun.sample(ReadmittedWithin30Days ~ ., data = train, method = "under", N = 86420, seed = 1)$data
+table(train_balanced_under$ReadmittedWithin30Days)
+
+#both over sampling and under sampling
+train_balanced_both <- ROSE::ovun.sample(ReadmittedWithin30Days ~ ., data = train, method = "both", p=0.5, N=200558, seed = 1)$data
+table(train_balanced_both$ReadmittedWithin30Days)
+
+
+set.seed(754)
+
+library(randomForest)
+
+summary(train$AGE)
+
+rf_model <- randomForest(factor(ReadmittedWithin30Days) ~ AGE + AWEEKEND +  DISPUNIFORM + DMONTH  + DQTR + DRG + DRG_NoPOA + I10_DX1 + MDC + ELECTIVE +
+                           FEMALE + LOS + RESIDENT+ HOSP_NRD.y + HOSP_BEDSIZE + HOSP_UR_TEACH+  PAY1 + PL_NCHS + ZIPINC_QRTL + SAMEDAYEVENT,
+                         ntree=5, data = train)
+
+rf_model_over <- randomForest(factor(ReadmittedWithin30Days) ~ AGE + AWEEKEND +  DISPUNIFORM + DMONTH  + DQTR + DRG + DRG_NoPOA + I10_DX1 + MDC + ELECTIVE +
+                           FEMALE + LOS + RESIDENT+ HOSP_NRD.y + HOSP_BEDSIZE + HOSP_UR_TEACH+  PAY1 + PL_NCHS + ZIPINC_QRTL + SAMEDAYEVENT,
+                         ntree=5, data = train_balanced_over)
+
+rf_model_under <- randomForest(factor(ReadmittedWithin30Days) ~ AGE + AWEEKEND +  DISPUNIFORM + DMONTH  + DQTR + DRG + DRG_NoPOA + I10_DX1 + MDC + ELECTIVE +
+                           FEMALE + LOS + RESIDENT+ HOSP_NRD.y + HOSP_BEDSIZE + HOSP_UR_TEACH+  PAY1 + PL_NCHS + ZIPINC_QRTL + SAMEDAYEVENT,
+                         ntree=5, data = train_balanced_under)
+
+rf_model_both <- randomForest(factor(ReadmittedWithin30Days) ~ AGE + AWEEKEND +  DISPUNIFORM + DMONTH  + DQTR + DRG + DRG_NoPOA + I10_DX1 + MDC + ELECTIVE +
+                           FEMALE + LOS + RESIDENT+ HOSP_NRD.y + HOSP_BEDSIZE + HOSP_UR_TEACH+  PAY1 + PL_NCHS + ZIPINC_QRTL + SAMEDAYEVENT,
+                         ntree=5, data = train_balanced_both)
+
+#rf_model <- randomForest(factor(ReadmittedWithin30Days) ~ FEMALE + PL_NCHS + RESIDENT + ZIPINC_QRTL + HOSP_URCAT4,
+#                         ntree=51, data = train)
+
+rf_model
+rf_model_over
+rf_model_under
+rf_model_both
+
+# HOSP_NRD.y, AGE, DMONTH, LOS, I10_DX1
+varImpPlot(rf_model,
+           sort=T,
+           n.var=10,
+           main="Top 10 Var. Imp. - unbalanced test data")
+
+prediction <- predict(rf_model, test)
+
+solution <- data.frame(VisitID = test$KEY_NRD, ReadmittedWithin30Days = prediction)
+
+View(solution)
+
+temp <- sqldf("select Count(*) from test where ReadmittedWithin30Days = 1")
+View(temp)  #43,723
+
+temp1 <- sqldf("select Count(*) from solution where ReadmittedWithin30Days = 1")
+View(temp1) #17,855
+
+# HOSP_NRD.y, AGE, LOS, DMONTH, I10_DX1
+varImpPlot(rf_model_over,
+           sort=T,
+           n.var=10,
+           main="Top 10 Var. Imp. - balanced oversampled test data")
+
+prediction_over <- predict(rf_model_over, test)
+
+solution_over <- data.frame(VisitID = test$KEY_NRD, ReadmittedWithin30Days = prediction_over)
+
+View(solution)
+
+temp <- sqldf("select Count(*) from test where ReadmittedWithin30Days = 1")
+View(temp)  #43,723
+
+temp1 <- sqldf("select Count(*) from solution_over where ReadmittedWithin30Days = 1")
+View(temp1) #39,820
+
+# HOSP_NRD.y, AGE, LOS, DMONTH, I10_DX1
+varImpPlot(rf_model_under,
+           sort=T,
+           n.var=10,
+           main="Top 10 Var. Imp. - balanced undersampled test data")
+
+prediction_under <- predict(rf_model_under, test)
+
+solution_under <- data.frame(VisitID = test$KEY_NRD, ReadmittedWithin30Days = prediction_under)
+
+View(solution_under)
+
+temp <- sqldf("select Count(*) from test where ReadmittedWithin30Days = 1")
+View(temp)  #43,723
+
+temp1 <- sqldf("select Count(*) from solution_under where ReadmittedWithin30Days = 1")
+View(temp1) #98,308
+
+# HOSP_NRD.y, AGE, LOS, DMONTH, I10_DX1
+varImpPlot(rf_model_both,
+           sort=T,
+           n.var=10,
+           main="Top 10 Var. Imp. - balanced both over & under sampled test data")
+
+prediction_both <- predict(rf_model_both, test)
+
+solution_both <- data.frame(VisitID = test$KEY_NRD, ReadmittedWithin30Days = prediction_both)
+
+View(solution_both)
+
+temp <- sqldf("select Count(*) from test where ReadmittedWithin30Days = 1")
+View(temp)  #43,723
+
+temp1 <- sqldf("select Count(*) from solution_both where ReadmittedWithin30Days = 1")
+View(temp1) #67,149
+
+
+
+# Build the model (note: not all possible variables are used)
+rf_model <- randomForest(factor(ReadmittedWithin30Days) ~ AGE + AWEEKEND +  DISPUNIFORM + DMONTH  + DQTR + DRG + DRG_NoPOA + I10_DX1 + MDC + ELECTIVE +
+                           FEMALE + LOS + RESIDENT+ HOSP_NRD.y + HOSP_BEDSIZE + HOSP_UR_TEACH+  PAY1 + PL_NCHS + ZIPINC_QRTL + SAMEDAYEVENT,
+                         data = train)
+# Show model error
+plot(rf_model, ylim=c(0,0.36))
+legend('topright', colnames(rf_model$err.rate), col=1:3, fill=1:3)
+
+prediction <- predict(rf_model, test) # Predict using the test set
+ncol(test)
+View(test)
+actualTest = test[,ncol(test)] # actual outputs for test set
+View(actualTest)
+confMatrixTest = table(prediction,actualTest) # compute confusion matrix
+confMatrixTest #show confusion matrix
+diag(confMatrixTest)
+sum(diag(confMatrixTest))
+sum(confMatrixTest)
+#compute accuracy
+accuracyTest = sum(diag(confMatrixTest))/sum(confMatrixTest)
+accuracyTest #show accuracy
